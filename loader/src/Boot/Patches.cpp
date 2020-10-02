@@ -3,9 +3,7 @@
 
 #include <Boot/Patches.hpp>
 
-using namespace Mira::Boot;
-
-void Patches::install_prePatches()
+void Mira::Boot::Patches::install_prePatches()
 {
 	switch (MIRA_PLATFORM)
 	{
@@ -30,8 +28,8 @@ void Patches::install_prePatches()
 		case MIRA_PLATFORM_ORBIS_BSD_505:
 			install_prerunPatches_505();
 			break;
-		case MIRA_PLATFORM_RASPI_ZERO:
-			// no patches needed for the raspi-z
+		case MIRA_PLATFORM_ORBIS_BSD_555:
+			install_prerunPatches_555();
 			break;
 		case MIRA_PLATFORM_ORBIS_BSD_620:
 			install_prerunPatches_620();
@@ -41,10 +39,6 @@ void Patches::install_prePatches()
 			break;
 		case MIRA_PLATFORM_ORBIS_BSD_672:
 			install_prerunPatches_672();
-			break;
-		case MIRA_PLATFORM_STEAM_LINK:
-		case MIRA_PLATFORM_STEAM_LINK2:
-			install_prerunPatches_SteamLink2();
 			break;
 		default:
 			break;

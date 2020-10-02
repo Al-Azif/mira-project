@@ -3,7 +3,7 @@
 
 // Offsets ported by SiSTRo & Joonie
 
-#if MIRA_PLATFORM==MIRA_PLATFORM_ORBIS_BSD_405
+#if MIRA_PLATFORM == MIRA_PLATFORM_ORBIS_BSD_405
 /*
 These are the required functions in order for the Oni Framework to operate properly
 These are all offsets into the base of the kernel. They expect all standard FreeBSD 9 prototypes
@@ -201,25 +201,40 @@ for the platforms that do enable kernel ASLR (Address Space Layout Randomization
 #define kdlsym_addr_mountpfs__sceSblPfsSetKeys_hookA                          0x0
 #define kdlsym_addr_mountpfs__sceSblPfsSetKeys_hookB                          0x0
 
+// sceRegMgr
+#define kdlsym_addr_sceRegMgrGetInt                        0x004CF9C0
+#define kdlsym_addr_sceRegMgrSetInt                        0x004CEAB0
+#define kdlsym_addr_sceRegMgrGetBin                        0x004D0330
+#define kdlsym_addr_sceRegMgrSetBin                        0x004D0260
+#define kdlsym_addr_sceRegMgrGetStr                        0x004D0140
+#define kdlsym_addr_sceRegMgrSetStr                        0x004CFD90
+
 // SceShellCore patches - call sceKernelIsGenuineCEX
 #define ssc_sceKernelIsGenuineCEX_patchA                   0x0011A0DB
 #define ssc_sceKernelIsGenuineCEX_patchB                   0x0066EA3B
 #define ssc_sceKernelIsGenuineCEX_patchC                   0x007F554B
-#define ssc_sceKernelIsGenuineCEX_patchD                   0x0
+//#define ssc_sceKernelIsGenuineCEX_patchD                   0x0
 
 // SceShellCore patches - call nidf_libSceDipsw
 #define ssc_nidf_libSceDipsw_patchA                        0x0011A107
 #define ssc_nidf_libSceDipsw_patchB                        0x0066EA67
 #define ssc_nidf_libSceDipsw_patchC                        0x007F5577
-#define ssc_nidf_libSceDipsw_patchD                        0x0
+//#define ssc_nidf_libSceDipsw_patchD                        0x0
 
 #define ssc_enable_fakepkg_patch                           0x0032F8F3
 
 // SceShellCore patches - use free prefix instead fake
 #define ssc_fake_to_free_patch                             0x00C980EE
 
+// SceShellCore patches - enable remote pkg installer
+#define ssc_enable_data_mount_patch                        0x00276A7C
+
 // SceShellCore patches - enable VR without spoof
-#define ssc_enable_vr                                      0x00AA0590
+#define ssc_enable_vr_patch                                0x00AA0590
+
+// SceShellCore patches - enable official external HDD support (Support added in 4.50)
+//#define ssc_external_hdd_pkg_installer_patch               0x0
+//#define ssc_external_hdd_version_patch                     0x0
 
 // SceShellUI patches - debug patches
 #define ssu_sceSblRcMgrIsAllowDebugMenuForSettings_patch   0x000198C0
@@ -232,13 +247,5 @@ for the platforms that do enable kernel ASLR (Address Space Layout Randomization
 // SceRemotePlay - enabler patches
 #define srp_enabler_patchA                                 0x00065ED2
 #define srp_enabler_patchB                                 0x00065EED
-
-// sceRegMgr
-#define kdlsym_addr_sceRegMgrGetInt                        0x004CF9C0
-#define kdlsym_addr_sceRegMgrSetInt                        0x004CEAB0
-#define kdlsym_addr_sceRegMgrGetBin                        0x004D0330
-#define kdlsym_addr_sceRegMgrSetBin                        0x004D0260
-#define kdlsym_addr_sceRegMgrGetStr                        0x004D0140
-#define kdlsym_addr_sceRegMgrSetStr                        0x004CFD90
 
 #endif

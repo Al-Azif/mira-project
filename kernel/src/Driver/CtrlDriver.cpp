@@ -42,11 +42,9 @@ using namespace Mira::Driver;
 void* orig_ioctl;
 
 CtrlDriver::CtrlDriver() :
-    m_processStartHandler(nullptr),
     m_DeviceSw { 0 },
     m_Device(nullptr)
 {
-    auto eventhandler_register = (eventhandler_tag(*)(struct eventhandler_list *list, const char *name, void *func, void *arg, int priority))kdlsym(eventhandler_register);
     auto make_dev_p = (int(*)(int _flags, struct cdev **_cdev, struct cdevsw *_devsw, struct ucred *_cr, uid_t _uid, gid_t _gid, int _mode, const char *_fmt, ...))kdlsym(make_dev_p);
 
     // Set up our device driver information
@@ -79,11 +77,9 @@ CtrlDriver::CtrlDriver() :
         WriteLog(LL_Error, "could not create device driver (%d).", s_ErrorDev);
         return;
     }
-
-    m_processStartHandler = EVENTHANDLER_REGISTER(process_exec, reinterpret_cast<void*>(OnProcessStart), nullptr, EVENTHANDLER_PRI_ANY);
 }
 
-void CtrlDriver::OnProcessStart(void *arg, struct proc *p)
+void CtrlDriver::OnProcessExec(void* __unused a1, struct proc *p)
 {
     auto snprintf = (int(*)(char *str, size_t size, const char *format, ...))kdlsym(snprintf);
     struct thread* s_ProcessThread = FIRST_THREAD_IN_PROC(p);
@@ -134,16 +130,7 @@ void CtrlDriver::OnProcessStart(void *arg, struct proc *p)
 
 CtrlDriver::~CtrlDriver()
 {
-    auto eventhandler_deregister = (void(*)(struct eventhandler_list* a, struct eventhandler_entry* b))kdlsym(eventhandler_deregister);
-    auto eventhandler_find_list = (struct eventhandler_list * (*)(const char *name))kdlsym(eventhandler_find_list);
-
     WriteLog(LL_Debug, "destroying driver");
-
-    // Disable the eventhandler
-    if (m_processStartHandler) {
-        EVENTHANDLER_DEREGISTER(process_exec, m_processStartHandler);
-        m_processStartHandler = nullptr;
-    }
 
     // Destroy the device driver
     auto destroy_dev = (void(*)(struct cdev *_dev))kdlsym(destroy_dev);
@@ -185,10 +172,10 @@ int32_t CtrlDriver::OnIoctl(struct cdev* p_Device, u_long p_Command, caddr_t p_D
                 // Get the requested process information
                 case MIRA_GET_PROC_INFORMATION:
                     return OnMiraGetProcInformation(p_Device, p_Command, p_Data, p_FFlag, p_Thread);
-                
+
                 case MIRA_GET_PID_LIST:
                     return OnMiraGetProcList(p_Device, p_Command, p_Data, p_FFlag, p_Thread);
-                
+
                 case MIRA_MOUNT_IN_SANDBOX:
                     return OnMiraMountInSandbox(p_Device, p_Command, p_Data, p_FFlag, p_Thread);
 
@@ -244,7 +231,7 @@ int32_t CtrlDriver::OnMiraGetProcInformation(struct cdev* p_Device, u_long p_Com
         delete [] s_Output;
         return -EMSGSIZE;
     }
-    
+
     // Copy out the data if the size is large enough
     s_Result = copyout(s_Output, p_Data, s_Output->Size);
     if (s_Result != 0)
@@ -361,7 +348,7 @@ int32_t CtrlDriver::OnMiraMountInSandbox(struct cdev* p_Device, u_long p_Command
         WriteLog(LL_Error, "invalid input path.");
         return -EACCES;
     }
-    
+
     // Get the jailed path
     char* s_SandboxPath = nullptr;
     char* s_FreePath = nullptr;
@@ -379,7 +366,7 @@ int32_t CtrlDriver::OnMiraMountInSandbox(struct cdev* p_Device, u_long p_Command
 
         if (s_FreePath != nullptr)
             delete s_FreePath;
-        
+
         return -1;
     }
 
@@ -393,7 +380,7 @@ int32_t CtrlDriver::OnMiraMountInSandbox(struct cdev* p_Device, u_long p_Command
         s_Result = snprintf(s_InSandboxPath, sizeof(s_InSandboxPath), "%s/%s", s_SandboxPath, "myFolderName");
         if (s_Result <= 0)
             break;
-        
+
         s_Result = snprintf(s_RealPath, sizeof(s_RealPath), s_Input.Path);
         if (s_Result <= 0)
             break;
@@ -416,7 +403,7 @@ int32_t CtrlDriver::OnMiraMountInSandbox(struct cdev* p_Device, u_long p_Command
             WriteLog(LL_Error, "could not create the directory for mount (%s) (%d).", s_InSandboxPath, s_Result);
             break;
         }
-        
+
         // In order for the mount call, it uses the calling thread to see if it has permissions
         auto s_CurrentThreadCred = curthread->td_proc->p_ucred;
         auto s_CurrentThreadFd = curthread->td_proc->p_fd;
@@ -452,7 +439,7 @@ int32_t CtrlDriver::OnMiraMountInSandbox(struct cdev* p_Device, u_long p_Command
             // Restore credentials and fd
             *s_CurrentThreadCred = s_OriginalThreadCred;
             *s_CurrentThreadFd = s_OriginalThreadFd;
-            
+
             break;
         }
 
@@ -482,7 +469,7 @@ bool CtrlDriver::GetProcessInfo(int32_t p_ProcessId, MiraProcessInformation*& p_
     // Check the process id (we don't allow querying kernel)
     if (p_ProcessId <= 0)
         return false;
-    
+
     // Debugging
     if (p_Result != nullptr)
         WriteLog(LL_Warn, "Result is not null, is this intended?");
@@ -514,9 +501,8 @@ bool CtrlDriver::GetProcessInfo(int32_t p_ProcessId, MiraProcessInformation*& p_
 
     // Copy over our names to local memory
     memcpy(s_Name, s_Proc->p_comm, sizeof(s_Proc->p_comm));
-    memcpy(s_ElfPath, s_Proc->p_elfpath, sizeof(s_Proc->p_comm));
+    memcpy(s_ElfPath, s_Proc->p_elfpath, sizeof(s_Proc->p_elfpath));
     memcpy(s_RandomizedPath, s_Proc->p_randomized_path, sizeof(s_Proc->p_randomized_path));
-
 
     // Iterate through each thread in the process
     struct thread* s_CurrentThread = nullptr;
@@ -604,14 +590,14 @@ bool CtrlDriver::GetProcessInfo(int32_t p_ProcessId, MiraProcessInformation*& p_
 
         s_Success = true;
     } while (false);
-    
+
     // Clean up our allocations
     for (auto i = 0; i < s_Threads.size(); ++i)
     {
         auto l_Info = s_Threads.at(i);
         if (l_Info != nullptr)
             delete l_Info;
-        
+
         s_Threads[i] = nullptr;
     }
 
@@ -621,7 +607,7 @@ bool CtrlDriver::GetProcessInfo(int32_t p_ProcessId, MiraProcessInformation*& p_
 }
 
 bool CtrlDriver::GetProcessList(MiraProcessList*& p_List)
-{	
+{
     auto _mtx_lock_flags = (void(*)(struct mtx *mutex, int flags))kdlsym(_mtx_lock_flags);
     auto _mtx_unlock_flags = (void(*)(struct mtx *mutex, int flags))kdlsym(_mtx_unlock_flags);
     auto _sx_slock = (int(*)(struct sx *sx, int opts, const char *file, int line))kdlsym(_sx_slock);
@@ -629,7 +615,7 @@ bool CtrlDriver::GetProcessList(MiraProcessList*& p_List)
 
     if (p_List != nullptr)
         WriteLog(LL_Warn, "process list already filled in, is this a bug?");
-    
+
     Vector<int32_t> s_Pids;
 
     struct proclist* allproc = (struct proclist*)*(uint64_t*)kdlsym(allproc);
@@ -678,7 +664,7 @@ int32_t CtrlDriver::OnMiraThreadCredentials(struct cdev* p_Device, u_long p_Comm
 {
     auto copyout = (int(*)(const void *kaddr, void *udaddr, size_t len))kdlsym(copyout);
     auto copyin = (int(*)(const void* uaddr, void* kaddr, size_t len))kdlsym(copyin);
-    
+
     // Read the input structure
     MiraThreadCredentials s_Input;
     auto s_Result = copyin(p_Data, &s_Input, sizeof(s_Input));
@@ -745,7 +731,7 @@ bool CtrlDriver::SetThreadCredentials(int32_t p_ProcessId, int32_t p_ThreadId, M
     // Make sure that we are setting threads
     if (p_Input.State != MiraThreadCredentials::_State::Set)
         return false;
-    
+
     // Get the process, this returns locked
     auto s_Process = pfind(p_ProcessId);
     if (s_Process == nullptr)
@@ -772,7 +758,7 @@ bool CtrlDriver::SetThreadCredentials(int32_t p_ProcessId, int32_t p_ThreadId, M
                         WriteLog(LL_Error, "could not get thread ucred for tid (%d).", l_Thread->td_tid);
                         break;
                     }
-                
+
                     // ucred
                     l_ThreadCredential->cr_uid = p_Input.EffectiveUserId;
                     l_ThreadCredential->cr_ruid = p_Input.RealUserId;
@@ -784,9 +770,9 @@ bool CtrlDriver::SetThreadCredentials(int32_t p_ProcessId, int32_t p_ThreadId, M
                     // prison
                     if (p_Input.Prison == MiraThreadCredentials::_MiraThreadCredentialsPrison::Root)
                         l_ThreadCredential->cr_prison = *(struct prison**)kdlsym(prison0);
-                    
+
                     l_ThreadCredential->cr_sceAuthID = p_Input.SceAuthId;
-                    
+
                     // TODO: Static assert that these are equal
                     memcpy(l_ThreadCredential->cr_sceCaps, p_Input.Capabilities, sizeof(l_ThreadCredential->cr_sceCaps));
 
@@ -797,12 +783,12 @@ bool CtrlDriver::SetThreadCredentials(int32_t p_ProcessId, int32_t p_ThreadId, M
                 }
 
             } while (false);
-            
+
             thread_unlock(l_Thread);
         }
     } while (false);
     _mtx_unlock_flags(&s_Process->p_mtx, 0);
-    
+
     return s_ThreadModified;
 }
 bool CtrlDriver::GetThreadCredentials(int32_t p_ProcessId, int32_t p_ThreadId, MiraThreadCredentials*& p_Output)
@@ -814,7 +800,7 @@ bool CtrlDriver::GetThreadCredentials(int32_t p_ProcessId, int32_t p_ThreadId, M
 
     if (p_Output != nullptr)
         WriteLog(LL_Info, "output is filled in, is this a bug?");
-    
+
     // Get the process
     auto s_Process = pfind(p_ProcessId);
     if (s_Process == nullptr)
@@ -833,7 +819,7 @@ bool CtrlDriver::GetThreadCredentials(int32_t p_ProcessId, int32_t p_ThreadId, M
 
         if (l_Thread == nullptr)
             continue;
-        
+
         // Lock the thread
         thread_lock(l_Thread);
 
@@ -862,7 +848,7 @@ bool CtrlDriver::GetThreadCredentials(int32_t p_ProcessId, int32_t p_ThreadId, M
                 s_Credentials->State = MiraThreadCredentials::_State::Get;
                 s_Credentials->ProcessId = p_ProcessId;
                 s_Credentials->ThreadId = p_ThreadId;
-                
+
                 // ucred
                 s_Credentials->EffectiveUserId = l_ThreadCredential->cr_uid;
                 s_Credentials->RealUserId = l_ThreadCredential->cr_ruid;
@@ -876,7 +862,7 @@ bool CtrlDriver::GetThreadCredentials(int32_t p_ProcessId, int32_t p_ThreadId, M
                     s_Credentials->Prison = MiraThreadCredentials::_MiraThreadCredentialsPrison::Root;
                 else
                     s_Credentials->Prison = MiraThreadCredentials::_MiraThreadCredentialsPrison::Default;
-                
+
                 s_Credentials->SceAuthId = (SceAuthenticationId)(l_ThreadCredential->cr_sceAuthID);
 
                 // Check that the sizes are the same and copy it as-is, idgaf
@@ -890,13 +876,13 @@ bool CtrlDriver::GetThreadCredentials(int32_t p_ProcessId, int32_t p_ThreadId, M
             } while (false);
         }
 
-        // Unlock the thread        
+        // Unlock the thread
         thread_unlock(l_Thread);
 
         if (s_TidFound)
             break;
     }
-    
+
     // Unlock the process
     _mtx_unlock_flags(&s_Process->p_mtx, 0);
 

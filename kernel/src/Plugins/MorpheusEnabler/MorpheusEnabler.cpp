@@ -17,7 +17,9 @@ extern "C"
 using namespace Mira::Plugins;
 using namespace Mira::OrbisOS;
 
-MorpheusEnabler::MorpheusEnabler()
+MorpheusEnabler::MorpheusEnabler() :
+	m_processStartEvent(nullptr),
+	m_resumeEvent(nullptr)
 {
 
 }
@@ -35,9 +37,8 @@ void MorpheusEnabler::ProcessStartEvent(void *arg, struct ::proc *p)
         return;
 
     char* s_TitleId = (char*)((uint64_t)p + 0x390);
-    if (strncmp(s_TitleId, "NPXS20001", 9) == 0) {
+    if (strncmp(s_TitleId, "NPXS20000", 9) == 0)
         DoPatch();
-    }
 
     return;
 }
@@ -97,7 +98,7 @@ bool MorpheusEnabler::DoPatch()
 	delete [] s_Entries;
 	s_Entries = nullptr;
 
-	s_Ret = Utilities::ProcessReadWriteMemory(s_Process, (void*)(s_TextStart + ssc_enable_vr), 3, (void*)"\x31\xC0\xC3", nullptr, true);
+	s_Ret = Utilities::ProcessReadWriteMemory(s_Process, (void*)(s_TextStart + ssc_enable_vr_patch), 3, (void*)"\x31\xC0\xC3", nullptr, true);
 	if (s_Ret < 0)
 	{
 			WriteLog(LL_Error, "ssc_enable_vr");
