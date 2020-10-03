@@ -552,7 +552,6 @@ int Substitute::DisableHook(struct proc* p, int hook_id) {
             _mtx_unlock_flags(&hook_mtx, 0, __FILE__, __LINE__);
 
             return SUBSTITUTE_INVALID;
-            break;
         }
     }
     _mtx_unlock_flags(&hook_mtx, 0, __FILE__, __LINE__);
